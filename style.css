@@ -16,11 +16,9 @@ body {
     font-family: var(--font-mono), var(--font-emoji);
     margin: 0;
     padding: 1rem;
-    position: fixed;
-    left: 0;
-    top: 0;
-    right: 0;
-    bottom: 0;
+    position: relative;
+    min-height: 100vh;
+    overflow-y: auto;
 }
 
 body * {
@@ -82,7 +80,7 @@ body * {
     }
 }
 
-body *:active {
+body *:active:not(:has(:active)) {
     animation: slight-color-fast-background-flash-animation 0.1s linear infinite;
     background-color: red;
 
@@ -118,5 +116,5 @@ img.spinning-plate.oh-no {
     --moz-user-select: none;
     outline: none;
     -webkit-tap-highlight-color: transparent;
-    touch-action: none !important;
+    touch-action: auto;
 }

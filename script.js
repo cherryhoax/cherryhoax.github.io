@@ -36,6 +36,7 @@ const animations = new WeakMap();
 const timers = new WeakMap();
 const hovered = new Set();
 const active = new Set();
+let currentHover = null;
 
 const randomBetween = (min, max) => min + Math.random() * (max - min);
 
@@ -49,6 +50,27 @@ const isEligible = (el) => {
     }
 
     return !el.closest("script, style");
+};
+
+const getEligibleFromNode = (node) => {
+    let el = node;
+    while (el && el instanceof HTMLElement) {
+        if (isEligible(el)) {
+            return el;
+        }
+        el = el.parentElement;
+    }
+    return null;
+};
+
+const getDeepestEligibleTarget = (event) => {
+    const path = typeof event.composedPath === "function" ? event.composedPath() : [event.target];
+    for (const node of path) {
+        if (isEligible(node)) {
+            return node;
+        }
+    }
+    return null;
 };
 
 const randomAxis = () => [
@@ -122,29 +144,36 @@ const stopHover = (el) => {
     timers.delete(el);
 };
 
-document.addEventListener("pointerenter", (event) => {
-    const el = event.target;
-    if (!isEligible(el)) {
+const setHoverTarget = (el) => {
+    if (currentHover === el) {
         return;
     }
-    hovered.add(el);
-    startHover(el);
+    if (currentHover) {
+        hovered.delete(currentHover);
+        active.delete(currentHover);
+        stopHover(currentHover);
+    }
+    currentHover = el;
+    if (currentHover) {
+        hovered.add(currentHover);
+        startHover(currentHover);
+    }
+};
+
+document.addEventListener("pointermove", (event) => {
+    const node = document.elementFromPoint(event.clientX, event.clientY);
+    const el = getEligibleFromNode(node);
+    setHoverTarget(el);
 }, true);
 
-document.addEventListener("pointerleave", (event) => {
-    const el = event.target;
-    if (!isEligible(el)) {
-        return;
-    }
-    hovered.delete(el);
-    active.delete(el);
-    stopHover(el);
+document.addEventListener("pointerleave", () => {
+    setHoverTarget(null);
 }, true);
 
 document.addEventListener("pointerdown", (event) => {
-    const el = event.target;
     cursor.classList.add("oh-no");
-    if (!isEligible(el)) {
+    const el = getDeepestEligibleTarget(event);
+    if (!el) {
         return;
     }
     active.add(el);
@@ -155,9 +184,9 @@ document.addEventListener("pointerdown", (event) => {
 }, true);
 
 const releaseActive = (event) => {
-    const el = event.target;
     cursor.classList.remove("oh-no");
-    if (!isEligible(el)) {
+    const el = getDeepestEligibleTarget(event);
+    if (!el) {
         return;
     }
     active.delete(el);
