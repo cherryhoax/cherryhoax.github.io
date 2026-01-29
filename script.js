@@ -10,12 +10,10 @@ document.body.appendChild(cursor);
 document.body.addEventListener("mouseenter", (event) => {
     cursor.style.left = `${event.clientX + 8}px`;
     cursor.style.top = `${event.clientY + 8}px`;
-    cursor.style.visibility = "visible";
-    document.body.style.cursor = "none";
+    cursor.style.visibility = "hidden";
 });
 document.body.addEventListener("mouseleave", (event) => {
     cursor.style.visibility = "hidden";
-    document.body.style.cursor = "";
 });
 document.body.addEventListener("mousemove", (event) => {
     cursor.style.left = `${event.clientX + 8}px`;
@@ -23,15 +21,18 @@ document.body.addEventListener("mousemove", (event) => {
 });
 
 const baseConfig = {
-    durationMs: 300,
-    refreshMs: 300,
-    steps: 8,
-    rotateDeg: 2,
-    scaleDelta: 0.035,
-    translatePx: 1.1
+    durationMs: 320,
+    refreshMs: 320,
+    steps: 6,
+    rotateDeg: 6,
+    scaleDelta: 0.04,
+    translatePx: 1.2,
+    perspectivePx: 100,
+    useScale: true,
+    useTranslate: false
 };
 
-const neutralTransform = "rotate3d(1, 0, 0, 0deg) scale3d(1, 1, 1) translate3d(0, 0, 0)";
+const neutralTransform = `perspective(${baseConfig.perspectivePx}px) rotate3d(1, 0, 0, 0deg) scale3d(1, 1, 1) translate3d(0, 0, 0)`;
 const animations = new WeakMap();
 const timers = new WeakMap();
 const hovered = new Set();
@@ -41,6 +42,9 @@ let currentHover = null;
 const randomBetween = (min, max) => min + Math.random() * (max - min);
 
 const isEligible = (el) => {
+    if (!el.matches("h1, h2, h3, h4, h5, h6, p, button, li, img, a")) {
+        return false;
+    }
     if (!(el instanceof HTMLElement)) {
         return false;
     }
@@ -82,12 +86,13 @@ const randomAxis = () => [
 const randomFrame = (settings) => {
     const [x, y, z] = randomAxis();
     const angle = randomBetween(-settings.rotateDeg, settings.rotateDeg);
-    const sx = 1 + randomBetween(-settings.scaleDelta, settings.scaleDelta);
-    const sy = 1 + randomBetween(-settings.scaleDelta, settings.scaleDelta);
-    const tx = randomBetween(-settings.translatePx, settings.translatePx);
-    const ty = randomBetween(-settings.translatePx, settings.translatePx);
+    const sx = settings.useScale ? 1 + randomBetween(-settings.scaleDelta, settings.scaleDelta) : 1;
+    const sy = settings.useScale ? 1 + randomBetween(-settings.scaleDelta, settings.scaleDelta) : 1;
+    const tx = settings.useTranslate ? randomBetween(-settings.translatePx, settings.translatePx) : 0;
+    const ty = settings.useTranslate ? randomBetween(-settings.translatePx, settings.translatePx) : 0;
 
-    return `rotate3d(${x.toFixed(2)}, ${y.toFixed(2)}, ${z.toFixed(2)}, ${angle.toFixed(2)}deg) `
+    return `perspective(${settings.perspectivePx}px) `
+        + `rotate3d(${x.toFixed(2)}, ${y.toFixed(2)}, ${z.toFixed(2)}, ${angle.toFixed(2)}deg) `
         + `scale3d(${sx.toFixed(3)}, ${sy.toFixed(3)}, 1) `
         + `translate3d(${tx.toFixed(2)}px, ${ty.toFixed(2)}px, 0)`;
 };
@@ -99,6 +104,16 @@ const buildKeyframes = (settings) => {
     }
     frames.push({ transform: neutralTransform, offset: 1 });
     return frames;
+};
+
+const applyIdleTransform = (el, settings = baseConfig) => {
+    el.style.transition = "transform 180ms ease";
+    el.style.transform = randomFrame(settings);
+};
+
+const resetIdleTransform = (el) => {
+    el.style.transition = "transform 180ms ease";
+    el.style.transform = neutralTransform;
 };
 
 const startHover = (el, overrides = {}) => {
@@ -152,11 +167,12 @@ const setHoverTarget = (el) => {
         hovered.delete(currentHover);
         active.delete(currentHover);
         stopHover(currentHover);
+        resetIdleTransform(currentHover);
     }
     currentHover = el;
     if (currentHover) {
         hovered.add(currentHover);
-        startHover(currentHover);
+        applyIdleTransform(currentHover);
     }
 };
 
@@ -177,9 +193,17 @@ document.addEventListener("pointerdown", (event) => {
         return;
     }
     active.add(el);
+    el.style.transition = "none";
     startHover(el, {
-        rotateDeg: 8, durationMs: 150, refreshMs: 150, scaleDelta: 0.1,
-        translatePx: 2
+        rotateDeg: 10,
+        durationMs: 120,
+        refreshMs: 120,
+        steps: 10,
+        scaleDelta: 0.18,
+        translatePx: 4,
+        perspectivePx: 1000,
+        useScale: true,
+        useTranslate: true
     });
 }, true);
 
@@ -191,9 +215,12 @@ const releaseActive = (event) => {
     }
     active.delete(el);
     if (hovered.has(el)) {
-        startHover(el);
+        stopHover(el);
+        el.style.transition = "transform 180ms ease";
+        applyIdleTransform(el);
     } else {
         stopHover(el);
+        resetIdleTransform(el);
     }
 };
 
